@@ -1,0 +1,49 @@
+---
+- name: Vertical Auto-Scaling Playbook
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+    # OpenStack AUTH
+    os_auth_url: "http://192.168.170.50:5000"
+    os_project_name: "Production Engineering"
+    os_project_domain_id: "default"
+    os_username: "admin"
+    os_user_domain_name: "Default"
+    os_password: "bLEZFvatBShkvUZyKrasUjmNdTTc9c3HcxWykrro"
+    os_region_name: "RegionOne"
+    os_interface: "public"
+    os_identity_api_version: "3"
+
+  tasks:
+
+    - name: Resize VM
+      openstack.cloud.server:
+        auth:
+          auth_url: "{{ os_auth_url }}"
+          username: "{{ os_username }}"
+          password: "{{ os_password }}"
+          project_name: "{{ os_project_name }}"
+          user_domain_name: "{{ os_user_domain_name }}"
+          project_domain_name: "{{ os_project_domain_id }}"
+        region_name: "{{ os_region_name }}"
+        interface: "{{ os_interface }}"
+        identity_api_version: "{{ os_identity_api_version }}"
+        name: "{{ vm_name }}"
+        flavor: "{{ new_flavor }}"
+        wait: yes
+
+    - name: Confirm Resize
+      openstack.cloud.server_action:
+        auth:
+          auth_url: "{{ os_auth_url }}"
+          username: "{{ os_username }}"
+          password: "{{ os_password }}"
+          project_name: "{{ os_project_name }}"
+          user_domain_name: "{{ os_user_domain_name }}"
+          project_domain_name: "{{ os_project_domain_id }}"
+        region_name: "{{ os_region_name }}"
+        interface: "{{ os_interface }}"
+        identity_api_version: "{{ os_identity_api_version }}"
+        server: "{{ vm_name }}"
+        action: confirm_resize
