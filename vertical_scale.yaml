@@ -1,10 +1,9 @@
 ---
-- name: Vertical Scaling Playbook (Corrected)
+- name: Vertical Scaling Playbook (Working Resize)
   hosts: localhost
   gather_facts: no
 
   vars:
-    # OpenStack AUTH (your details)
     os_auth_url: "http://192.168.170.50:5000"
     os_project_name: "Production Engineering"
     os_project_domain_id: "default"
@@ -16,8 +15,8 @@
 
   tasks:
 
-    - name: Initiate VM Resize
-      openstack.cloud.server_action:
+    - name: Resize VM flavor
+      openstack.cloud.compute:
         auth:
           auth_url: "{{ os_auth_url }}"
           username: "{{ os_username }}"
@@ -28,15 +27,15 @@
         region_name: "{{ os_region_name }}"
         interface: "{{ os_interface }}"
         server: "{{ vm_name }}"
-        action: resize
         flavor: "{{ new_flavor }}"
-      register: resize_result
+        action: resize
+      register: resize_output
 
     - debug:
-        msg: "Resize initiated: {{ resize_result }}"
+        msg: "Resize initiated successfully: {{ resize_output }}"
 
-    - name: Confirm VM Resize
-      openstack.cloud.server_action:
+    - name: Confirm the resize
+      openstack.cloud.compute:
         auth:
           auth_url: "{{ os_auth_url }}"
           username: "{{ os_username }}"
