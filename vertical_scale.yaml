@@ -1,22 +1,26 @@
 ---
-- name: Resize VM using VM NAME (AWX Compatible)
+- name: Resize VM using VM NAME (AWX Compatible with Updated Auth)
   hosts: localhost
   gather_facts: no
 
   vars:
     os_auth_url: "http://192.168.170.50:5000/v3/auth/tokens"
     os_compute_base: "http://192.168.170.50:8774/v2.1"
+    os_project_id: "74b44d9c494348d095f0f6e92a74e229"
     os_project_name: "Production Engineering"
-    os_project_domain: "Default"
+    os_project_domain: "default"
     os_user_domain: "Default"
     os_username: "admin"
     os_password: "bLEZFvatBShkvUZyKrasUjmNdTTc9c3HcxWykrro"
+    os_region_name: "RegionOne"
+    os_interface: "public"
+    os_identity_api_version: 3
 
   tasks:
 
-    ######################################################################
-    # 1. AUTHENTICATE AND GET TOKEN
-    ######################################################################
+    ###############################################################
+    # 1. AUTHENTICATE TO KEYSTONE → GET TOKEN
+    ###############################################################
     - name: Authenticate to Keystone
       uri:
         url: "{{ os_auth_url }}"
@@ -35,16 +39,15 @@
                   password: "{{ os_password }}"
             scope:
               project:
-                name: "{{ os_project_name }}"
-                domain: { name: "{{ os_project_domain }}" }
+                id: "{{ os_project_id }}"
       register: keystone_auth
 
     - set_fact:
         token: "{{ keystone_auth.x_subject_token }}"
 
-    ######################################################################
-    # 2. FIND VM BY NAME → GET UUID
-    ######################################################################
+    ###############################################################
+    # 2. FIND VM UUID BY NAME
+    ###############################################################
     - name: Get server list
       uri:
         url: "{{ os_compute_base }}/servers/detail"
@@ -63,15 +66,15 @@
 
     - name: Fail if VM not found
       fail:
-        msg: "VM {{ vm_name }} not found!"
+        msg: "VM {{ vm_name }} not found in project {{ os_project_name }}!"
       when: vm_id is not defined
 
     - debug:
         msg: "Found VM {{ vm_name }} → UUID: {{ vm_id }}"
 
-    ######################################################################
+    ###############################################################
     # 3. RESIZE USING UUID
-    ######################################################################
+    ###############################################################
     - name: Resize VM
       uri:
         url: "{{ os_compute_base }}/servers/{{ vm_id }}/action"
@@ -88,9 +91,9 @@
     - debug:
         msg: "Resize initiated: {{ resize_output }}"
 
-    ######################################################################
+    ###############################################################
     # 4. CONFIRM RESIZE
-    ######################################################################
+    ###############################################################
     - name: Confirm Resize
       uri:
         url: "{{ os_compute_base }}/servers/{{ vm_id }}/action"
