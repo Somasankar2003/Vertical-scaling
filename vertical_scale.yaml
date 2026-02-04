@@ -1,17 +1,22 @@
 ---
-- name: Resize VM using VM NAME with Automatic Confirm
+- name: Resize VM using VM NAME with Automatic Confirm (Project Name Only)
   hosts: localhost
   gather_facts: no
 
   vars:
+    # OpenStack AUTH
     os_auth_url: "http://192.168.170.50:5000/v3/auth/tokens"
     os_compute_base: "http://192.168.170.50:8774/v2.1"
-    os_project_id: "74b44d9c494348d095f0f6e92a74e229"
-    os_project_name: "Production Engineering"
+
+    # PROJECT VARIABLES (NOW ONLY PROJECT NAME)
+    os_project_name: "{{ project_name }}"
+
+    # DOMAIN + USER AUTH
     os_project_domain: "default"
     os_user_domain: "Default"
     os_username: "admin"
     os_password: "bLEZFvatBShkvUZyKrasUjmNdTTc9c3HcxWykrro"
+
     os_region_name: "RegionOne"
     os_interface: "public"
     os_identity_api_version: 3
@@ -39,14 +44,15 @@
                   password: "{{ os_password }}"
             scope:
               project:
-                id: "{{ os_project_id }}"
+                name: "{{ os_project_name }}"
+                domain: { name: "{{ os_project_domain }}" }
       register: keystone_auth
 
     - set_fact:
         token: "{{ keystone_auth.x_subject_token }}"
 
     ######################################################################
-    # 2. FIND VM UUID FROM NAME
+    # 2. FIND VM UUID BY VM NAME
     ######################################################################
     - name: Get server list
       uri:
@@ -73,9 +79,8 @@
     - debug:
         msg: "Found VM {{ vm_name }} → UUID: {{ vm_id }} (Status: {{ current_status }})"
 
-
     ######################################################################
-    # 3. AUTO-CONFIRM PREVIOUS RESIZE IF VM IS ALREADY IN RESIZED STATE
+    # 3. AUTO-CONFIRM PREVIOUS RESIZE IF VM IS IN RESIZED OR VERIFY_RESIZE
     ######################################################################
     - name: Auto-confirm previous unfinished resize
       uri:
@@ -93,7 +98,6 @@
     - debug:
         msg: "Auto-confirmed previous resize: {{ auto_confirm }}"
       when: current_status == "VERIFY_RESIZE" or current_status == "RESIZED"
-
 
     ######################################################################
     # 4. SEND NEW RESIZE REQUEST
@@ -114,9 +118,8 @@
     - debug:
         msg: "Resize initiated: {{ resize_output }}"
 
-
     ######################################################################
-    # 5. WAIT FOR VERIFY_RESIZE STATE
+    # 5. WAIT UNTIL VM ENTERS VERIFY_RESIZE
     ######################################################################
     - name: Wait for VM to enter VERIFY_RESIZE
       uri:
@@ -134,9 +137,8 @@
     - debug:
         msg: "VM is now in VERIFY_RESIZE state."
 
-
     ######################################################################
-    # 6. CONFIRM RESIZE AUTOMATICALLY
+    # 6. FINAL CONFIRM RESIZE
     ######################################################################
     - name: Confirm Resize
       uri:
