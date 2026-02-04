@@ -1,5 +1,5 @@
 ---
-- name: Resize VM using VM NAME (AWX Compatible with Updated Auth)
+- name: Resize VM using VM NAME (AWX Compatible with Updated Auth + Wait)
   hosts: localhost
   gather_facts: no
 
@@ -18,9 +18,9 @@
 
   tasks:
 
-    ###############################################################
-    # 1. AUTHENTICATE TO KEYSTONE → GET TOKEN
-    ###############################################################
+    ######################################################################
+    # 1. AUTHENTICATE → GET TOKEN
+    ######################################################################
     - name: Authenticate to Keystone
       uri:
         url: "{{ os_auth_url }}"
@@ -45,9 +45,9 @@
     - set_fact:
         token: "{{ keystone_auth.x_subject_token }}"
 
-    ###############################################################
-    # 2. FIND VM UUID BY NAME
-    ###############################################################
+    ######################################################################
+    # 2. FIND VM UUID FROM NAME
+    ######################################################################
     - name: Get server list
       uri:
         url: "{{ os_compute_base }}/servers/detail"
@@ -72,9 +72,9 @@
     - debug:
         msg: "Found VM {{ vm_name }} → UUID: {{ vm_id }}"
 
-    ###############################################################
-    # 3. RESIZE USING UUID
-    ###############################################################
+    ######################################################################
+    # 3. SEND RESIZE REQUEST
+    ######################################################################
     - name: Resize VM
       uri:
         url: "{{ os_compute_base }}/servers/{{ vm_id }}/action"
@@ -91,9 +91,28 @@
     - debug:
         msg: "Resize initiated: {{ resize_output }}"
 
-    ###############################################################
-    # 4. CONFIRM RESIZE
-    ###############################################################
+    ######################################################################
+    # 4. WAIT UNTIL VM ENTERS VERIFY_RESIZE STATE
+    ######################################################################
+    - name: Wait for VM to enter VERIFY_RESIZE
+      uri:
+        url: "{{ os_compute_base }}/servers/{{ vm_id }}"
+        method: GET
+        headers:
+          X-Auth-Token: "{{ token }}"
+        return_content: yes
+        status_code: 200
+      register: vm_status
+      until: vm_status.json.server.status == "VERIFY_RESIZE"
+      retries: 30
+      delay: 5
+
+    - debug:
+        msg: "VM is now in VERIFY_RESIZE state."
+
+    ######################################################################
+    # 5. CONFIRM RESIZE
+    ######################################################################
     - name: Confirm Resize
       uri:
         url: "{{ os_compute_base }}/servers/{{ vm_id }}/action"
