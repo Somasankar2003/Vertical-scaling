@@ -1,10 +1,10 @@
 ---
-- name: Vertical Auto-Scaling Playbook
+- name: Vertical Scaling Playbook (Corrected)
   hosts: localhost
   gather_facts: no
 
   vars:
-    # OpenStack AUTH
+    # OpenStack AUTH (your details)
     os_auth_url: "http://192.168.170.50:5000"
     os_project_name: "Production Engineering"
     os_project_domain_id: "default"
@@ -13,27 +13,10 @@
     os_password: "bLEZFvatBShkvUZyKrasUjmNdTTc9c3HcxWykrro"
     os_region_name: "RegionOne"
     os_interface: "public"
-    os_identity_api_version: "3"
 
   tasks:
 
-    - name: Resize VM
-      openstack.cloud.server:
-        auth:
-          auth_url: "{{ os_auth_url }}"
-          username: "{{ os_username }}"
-          password: "{{ os_password }}"
-          project_name: "{{ os_project_name }}"
-          user_domain_name: "{{ os_user_domain_name }}"
-          project_domain_name: "{{ os_project_domain_id }}"
-        region_name: "{{ os_region_name }}"
-        interface: "{{ os_interface }}"
-        identity_api_version: "{{ os_identity_api_version }}"
-        name: "{{ vm_name }}"
-        flavor: "{{ new_flavor }}"
-        wait: yes
-
-    - name: Confirm Resize
+    - name: Initiate VM Resize
       openstack.cloud.server_action:
         auth:
           auth_url: "{{ os_auth_url }}"
@@ -44,6 +27,24 @@
           project_domain_name: "{{ os_project_domain_id }}"
         region_name: "{{ os_region_name }}"
         interface: "{{ os_interface }}"
-        identity_api_version: "{{ os_identity_api_version }}"
+        server: "{{ vm_name }}"
+        action: resize
+        flavor: "{{ new_flavor }}"
+      register: resize_result
+
+    - debug:
+        msg: "Resize initiated: {{ resize_result }}"
+
+    - name: Confirm VM Resize
+      openstack.cloud.server_action:
+        auth:
+          auth_url: "{{ os_auth_url }}"
+          username: "{{ os_username }}"
+          password: "{{ os_password }}"
+          project_name: "{{ os_project_name }}"
+          user_domain_name: "{{ os_user_domain_name }}"
+          project_domain_name: "{{ os_project_domain_id }}"
+        region_name: "{{ os_region_name }}"
+        interface: "{{ os_interface }}"
         server: "{{ vm_name }}"
         action: confirm_resize
