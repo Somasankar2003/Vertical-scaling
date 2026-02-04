@@ -1,11 +1,11 @@
 ---
-- name: Vertical Scaling via Nova API (AWX Compatible)
+- name: Resize VM using VM NAME (AWX Compatible)
   hosts: localhost
   gather_facts: no
 
   vars:
     os_auth_url: "http://192.168.170.50:5000/v3/auth/tokens"
-    os_compute_url: "http://192.168.170.50:8774/v2.1"
+    os_compute_base: "http://192.168.170.50:8774/v2.1"
     os_project_name: "Production Engineering"
     os_project_domain: "Default"
     os_user_domain: "Default"
@@ -14,7 +14,10 @@
 
   tasks:
 
-    - name: Authenticate to Keystone (Get Token)
+    ######################################################################
+    # 1. AUTHENTICATE AND GET TOKEN
+    ######################################################################
+    - name: Authenticate to Keystone
       uri:
         url: "{{ os_auth_url }}"
         method: POST
@@ -39,9 +42,39 @@
     - set_fact:
         token: "{{ keystone_auth.x_subject_token }}"
 
-    - name: Perform Resize via Nova API
+    ######################################################################
+    # 2. FIND VM BY NAME → GET UUID
+    ######################################################################
+    - name: Get server list
       uri:
-        url: "{{ os_compute_url }}/servers/{{ vm_name }}/action"
+        url: "{{ os_compute_base }}/servers/detail"
+        method: GET
+        headers:
+          X-Auth-Token: "{{ token }}"
+        return_content: yes
+        status_code: 200
+      register: server_list
+
+    - name: Extract UUID by VM NAME
+      set_fact:
+        vm_id: "{{ item.id }}"
+      loop: "{{ server_list.json.servers }}"
+      when: item.name == vm_name
+
+    - name: Fail if VM not found
+      fail:
+        msg: "VM {{ vm_name }} not found!"
+      when: vm_id is not defined
+
+    - debug:
+        msg: "Found VM {{ vm_name }} → UUID: {{ vm_id }}"
+
+    ######################################################################
+    # 3. RESIZE USING UUID
+    ######################################################################
+    - name: Resize VM
+      uri:
+        url: "{{ os_compute_base }}/servers/{{ vm_id }}/action"
         method: POST
         headers:
           X-Auth-Token: "{{ token }}"
@@ -50,14 +83,17 @@
         body:
           resize:
             flavorRef: "{{ new_flavor }}"
-      register: resize_result
+      register: resize_output
 
     - debug:
-        msg: "Resize request sent: {{ resize_result }}"
+        msg: "Resize initiated: {{ resize_output }}"
 
+    ######################################################################
+    # 4. CONFIRM RESIZE
+    ######################################################################
     - name: Confirm Resize
       uri:
-        url: "{{ os_compute_url }}/servers/{{ vm_name }}/action"
+        url: "{{ os_compute_base }}/servers/{{ vm_id }}/action"
         method: POST
         headers:
           X-Auth-Token: "{{ token }}"
@@ -65,7 +101,7 @@
         status_code: 204
         body:
           confirmResize: null
-      register: confirm_result
+      register: confirm_output
 
     - debug:
-        msg: "Resize confirmed: {{ confirm_result }}"
+        msg: "Resize confirmed: {{ confirm_output }}"
