@@ -1,5 +1,5 @@
 ---
-- name: Vertical Scaling Playbook (Working Resize)
+- name: Vertical Scaling Playbook (Legacy AWX Compatible)
   hosts: localhost
   gather_facts: no
 
@@ -11,39 +11,30 @@
     os_user_domain_name: "Default"
     os_password: "bLEZFvatBShkvUZyKrasUjmNdTTc9c3HcxWykrro"
     os_region_name: "RegionOne"
-    os_interface: "public"
 
   tasks:
 
-    - name: Resize VM flavor
-      openstack.cloud.compute:
+    - name: Initiate Resize on VM
+      os_server_action:
         auth:
           auth_url: "{{ os_auth_url }}"
           username: "{{ os_username }}"
           password: "{{ os_password }}"
           project_name: "{{ os_project_name }}"
           user_domain_name: "{{ os_user_domain_name }}"
-          project_domain_name: "{{ os_project_domain_id }}"
-        region_name: "{{ os_region_name }}"
-        interface: "{{ os_interface }}"
+          project_domain_id: "{{ os_project_domain_id }}"
+        action: resize
         server: "{{ vm_name }}"
         flavor: "{{ new_flavor }}"
-        action: resize
-      register: resize_output
 
-    - debug:
-        msg: "Resize initiated successfully: {{ resize_output }}"
-
-    - name: Confirm the resize
-      openstack.cloud.compute:
+    - name: Confirm Resize
+      os_server_action:
         auth:
           auth_url: "{{ os_auth_url }}"
           username: "{{ os_username }}"
           password: "{{ os_password }}"
           project_name: "{{ os_project_name }}"
           user_domain_name: "{{ os_user_domain_name }}"
-          project_domain_name: "{{ os_project_domain_id }}"
-        region_name: "{{ os_region_name }}"
-        interface: "{{ os_interface }}"
-        server: "{{ vm_name }}"
+          project_domain_id: "{{ os_project_domain_id }}"
         action: confirm_resize
+        server: "{{ vm_name }}"
