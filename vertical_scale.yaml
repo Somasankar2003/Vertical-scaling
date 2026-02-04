@@ -1,5 +1,5 @@
 ---
-- name: Resize VM using VM NAME (AWX Compatible with Updated Auth + Wait)
+- name: Resize VM using VM NAME with Automatic Confirm
   hosts: localhost
   gather_facts: no
 
@@ -61,6 +61,7 @@
     - name: Extract UUID by VM NAME
       set_fact:
         vm_id: "{{ item.id }}"
+        current_status: "{{ item.status }}"
       loop: "{{ server_list.json.servers }}"
       when: item.name == vm_name
 
@@ -70,12 +71,34 @@
       when: vm_id is not defined
 
     - debug:
-        msg: "Found VM {{ vm_name }} → UUID: {{ vm_id }}"
+        msg: "Found VM {{ vm_name }} → UUID: {{ vm_id }} (Status: {{ current_status }})"
+
 
     ######################################################################
-    # 3. SEND RESIZE REQUEST
+    # 3. AUTO-CONFIRM PREVIOUS RESIZE IF VM IS ALREADY IN RESIZED STATE
     ######################################################################
-    - name: Resize VM
+    - name: Auto-confirm previous unfinished resize
+      uri:
+        url: "{{ os_compute_base }}/servers/{{ vm_id }}/action"
+        method: POST
+        headers:
+          X-Auth-Token: "{{ token }}"
+        body_format: json
+        status_code: 204
+        body:
+          confirmResize: null
+      when: current_status == "VERIFY_RESIZE" or current_status == "RESIZED"
+      register: auto_confirm
+
+    - debug:
+        msg: "Auto-confirmed previous resize: {{ auto_confirm }}"
+      when: current_status == "VERIFY_RESIZE" or current_status == "RESIZED"
+
+
+    ######################################################################
+    # 4. SEND NEW RESIZE REQUEST
+    ######################################################################
+    - name: Resize VM to new flavor
       uri:
         url: "{{ os_compute_base }}/servers/{{ vm_id }}/action"
         method: POST
@@ -91,8 +114,9 @@
     - debug:
         msg: "Resize initiated: {{ resize_output }}"
 
+
     ######################################################################
-    # 4. WAIT UNTIL VM ENTERS VERIFY_RESIZE STATE
+    # 5. WAIT FOR VERIFY_RESIZE STATE
     ######################################################################
     - name: Wait for VM to enter VERIFY_RESIZE
       uri:
@@ -110,8 +134,9 @@
     - debug:
         msg: "VM is now in VERIFY_RESIZE state."
 
+
     ######################################################################
-    # 5. CONFIRM RESIZE
+    # 6. CONFIRM RESIZE AUTOMATICALLY
     ######################################################################
     - name: Confirm Resize
       uri:
@@ -126,4 +151,4 @@
       register: confirm_output
 
     - debug:
-        msg: "Resize confirmed: {{ confirm_output }}"
+        msg: "Resize confirmed successfully: {{ confirm_output }}"
