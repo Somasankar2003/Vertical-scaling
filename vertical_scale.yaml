@@ -1,40 +1,46 @@
 ---
-- name: Vertical Scaling Playbook (Legacy AWX Compatible)
+- name: Vertical Scaling via OpenStack CLI
   hosts: localhost
   gather_facts: no
 
   vars:
-    os_auth_url: "http://192.168.170.50:5000"
+    os_auth_url: "http://192.168.170.50:5000/v3"
     os_project_name: "Production Engineering"
-    os_project_domain_id: "default"
+    os_project_domain: "Default"
     os_username: "admin"
-    os_user_domain_name: "Default"
+    os_user_domain: "Default"
     os_password: "bLEZFvatBShkvUZyKrasUjmNdTTc9c3HcxWykrro"
-    os_region_name: "RegionOne"
 
   tasks:
 
-    - name: Initiate Resize on VM
-      os_server_action:
-        auth:
-          auth_url: "{{ os_auth_url }}"
-          username: "{{ os_username }}"
-          password: "{{ os_password }}"
-          project_name: "{{ os_project_name }}"
-          user_domain_name: "{{ os_user_domain_name }}"
-          project_domain_id: "{{ os_project_domain_id }}"
-        action: resize
-        server: "{{ vm_name }}"
-        flavor: "{{ new_flavor }}"
+    - name: Export OpenStack environment variables
+      shell: |
+        export OS_AUTH_URL="{{ os_auth_url }}"
+        export OS_USERNAME="{{ os_username }}"
+        export OS_PASSWORD="{{ os_password }}"
+        export OS_PROJECT_NAME="{{ os_project_name }}"
+        export OS_USER_DOMAIN_NAME="{{ os_user_domain }}"
+        export OS_PROJECT_DOMAIN_NAME="{{ os_project_domain }}"
+        export OS_IDENTITY_API_VERSION=3
 
-    - name: Confirm Resize
-      os_server_action:
-        auth:
-          auth_url: "{{ os_auth_url }}"
-          username: "{{ os_username }}"
-          password: "{{ os_password }}"
-          project_name: "{{ os_project_name }}"
-          user_domain_name: "{{ os_user_domain_name }}"
-          project_domain_id: "{{ os_project_domain_id }}"
-        action: confirm_resize
-        server: "{{ vm_name }}"
+        openstack server resize --flavor "{{ new_flavor }}" "{{ vm_name }}"
+      register: resize_out
+
+    - debug:
+        var: resize_out
+
+    - name: Confirm the resize
+      shell: |
+        export OS_AUTH_URL="{{ os_auth_url }}"
+        export OS_USERNAME="{{ os_username }}"
+        export OS_PASSWORD="{{ os_password }}"
+        export OS_PROJECT_NAME="{{ os_project_name }}"
+        export OS_USER_DOMAIN_NAME="{{ os_user_domain }}"
+        export OS_PROJECT_DOMAIN_NAME="{{ os_project_domain }}"
+        export OS_IDENTITY_API_VERSION=3
+
+        openstack server resize confirm "{{ vm_name }}"
+      register: confirm_out
+
+    - debug:
+        var: confirm_out
